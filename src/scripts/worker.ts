@@ -26,7 +26,7 @@ async function enqueueDueSources() {
 
 const worker = new Worker("applypilot-scans", async (job) => {
   if (job.name === "scan-source") return scanSource(job.data.sourceId);
-}, { connection, concurrency: 2 });
+}, { connection: connection as any, concurrency: 2 });
 
 worker.on("completed", (job) => console.log(`Completed ${job.id}`));
 worker.on("failed", (job, error) => console.error(`Failed ${job?.id}`, error));
