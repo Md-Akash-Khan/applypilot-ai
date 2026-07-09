@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { scanSource } from "@/lib/crawler";
 
 const connection = new IORedis(process.env.REDIS_URL || "redis://localhost:6379", { maxRetriesPerRequest: null });
-const queue = new Queue("applypilot-scans", { connection });
+const queue = new Queue("applypilot-scans", { connection: connection as any });
 
 function dueMs(frequency: string) {
   if (frequency === "TWICE_DAILY") return 1000 * 60 * 60 * 12;
