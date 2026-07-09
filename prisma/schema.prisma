@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum JobCategory {
+  GOVERNMENT
+  PRIVATE_CORPORATE
+  ACADEMIC_RESEARCH
+  UNCATEGORIZED
+}
+
+enum JobStatus {
+  NEW
+  SAVED
+  APPLIED
+  INTERVIEW
+  OFFER
+  REJECTED
+  ARCHIVED
+  EXPIRED
+}
+
+enum SourceStatus {
+  ACTIVE
+  PAUSED
+  ERROR
+}
+
+enum ScanFrequency {
+  MANUAL
+  DAILY
+  TWICE_DAILY
+  WEEKLY
+}
+
+model User {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  settings     UserSettings?
+  sources      JobSource[]
+  jobs         Job[]
+  applications JobApplication[]
+}
+
+model UserSettings {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  roleKeywords       String   @default("[]")
+  excludedKeywords   String   @default("[]")
+  locations          String   @default("[]")
+  preferredJobTypes  String   @default("[]")
+  reminderDaysBefore Int      @default(3)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model JobSource {
+  id                 String        @id @default(cuid())
+  userId             String
+  name               String
+  url                String
+  keywords           String        @default("[]")
+  excludedKeywords   String        @default("[]")
+  locationPreference String        @default("[]")
+  jobTypes           String        @default("[]")
+  scanFrequency      ScanFrequency @default(DAILY)
+  status             SourceStatus  @default(ACTIVE)
+  lastScannedAt      DateTime?
+  lastError          String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs               Job[]
+  logs               CrawlerLog[]
+
+  @@unique([userId, url])
+  @@index([userId, status])
+}
+
+model Job {
+  id             String          @id @default(cuid())
+  userId         String
+  sourceId       String?
+  title          String
+  company        String
+  location       String?
+  deadline       DateTime?
+  category       JobCategory     @default(UNCATEGORIZED)
+  jobType        String?
+  salary         String?
+  description    String          @db.Text
+  requirements   String?         @db.Text
+  applyUrl       String?
+  sourceUrl      String?
+  rawText        String?         @db.Text
+  relevanceScore Int             @default(0)
+  status         JobStatus       @default(NEW)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source         JobSource?      @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  events         JobEvent[]
+  application    JobApplication?
+
+  @@index([userId, status])
+  @@index([userId, category])
+  @@index([deadline])
+}
+
+model JobApplication {
+  id          String    @id @default(cuid())
+  userId      String
+  jobId       String    @unique
+  appliedAt   DateTime?
+  status      JobStatus @default(SAVED)
+  notes       String?   @db.Text
+  followUpAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model JobEvent {
+  id        String   @id @default(cuid())
+  jobId     String
+  type      String
+  note      String?
+  createdAt DateTime @default(now())
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, createdAt])
+}
+
+model CrawlerLog {
+  id        String    @id @default(cuid())
+  sourceId  String
+  status    String
+  message   String?
+  jobsFound Int       @default(0)
+  scannedAt DateTime  @default(now())
+  source    JobSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+}
