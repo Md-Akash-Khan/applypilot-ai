@@ -1,0 +1,48 @@
+name: ApplyPilot Scheduled Scan
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    # Every 6 hours. GitHub cron uses UTC.
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: applypilot-scheduled-scan
+  cancel-in-progress: false
+
+jobs:
+  scan-jobs:
+    name: Scan career sources
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      NODE_ENV: production
+
+      CRAWLER_USER_AGENT: ApplyPilotAI/1.0
+      RESPECT_ROBOTS_TXT: "true"
+      CRAWLER_MAX_LINKS_PER_SOURCE: "30"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run ApplyPilot source scanner
+        run: npm run scan:once
