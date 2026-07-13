@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus, Radar } from "lucide-react";
 
 function split(value: string) {
   return value.split(",").map((item) => item.trim()).filter(Boolean);
@@ -25,61 +26,58 @@ export default function SourceForm() {
         jobTypes: split(String(formData.get("jobTypes") || "")),
         scanFrequency: String(formData.get("scanFrequency") || "DAILY")
       };
-      const response = await fetch("/api/sources", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      if (!response.ok) throw new Error("Could not save source. Check URL and required fields.");
+      const response = await fetch("/api/sources", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Could not save this source. Check the URL and try again.");
+      (document.getElementById("source-form") as HTMLFormElement | null)?.reset();
       router.refresh();
-      const form = document.getElementById("source-form") as HTMLFormElement | null;
-      form?.reset();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not save this source");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <form id="source-form" action={submit} className="glass grid gap-4 rounded-3xl p-5">
-      <div className="grid gap-4 md:grid-cols-2">
+    <form id="source-form" action={submit} className="card p-5 md:p-6">
+      <div className="mb-5 flex items-start gap-3">
+        <div className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]"><Radar size={19} /></div>
         <div>
-          <label className="mb-2 block text-sm font-bold text-white/70">Source name</label>
-          <input className="input" name="name" placeholder="Company / career page name" required />
-        </div>
-        <div>
-          <label className="mb-2 block text-sm font-bold text-white/70">Career page URL</label>
-          <input className="input" name="url" placeholder="https://company.com/careers" type="url" required />
+          <h2 className="section-title">Add a monitored career source</h2>
+          <p className="mt-1 text-sm leading-6 text-[var(--muted)]">Add the main careers page once. The scheduled scanner discovers individual role links, follows them, and imports only jobs matching your rules.</p>
         </div>
       </div>
+
       <div className="grid gap-4 md:grid-cols-2">
-        <div>
-          <label className="mb-2 block text-sm font-bold text-white/70">Role keywords</label>
-          <input className="input" name="keywords" placeholder="software engineer, executive, research assistant" />
-        </div>
-        <div>
-          <label className="mb-2 block text-sm font-bold text-white/70">Exclude keywords</label>
-          <input className="input" name="excludedKeywords" placeholder="unpaid, senior, sales" />
-        </div>
+        <Field label="Source name"><input className="input" name="name" placeholder="Therap (BD) Ltd." required /></Field>
+        <Field label="Career page URL"><input className="input" name="url" placeholder="https://company.com/careers" type="url" required /></Field>
+        <Field label="Relevant role keywords"><input className="input" name="keywords" placeholder="software engineer, devops, associate" /></Field>
+        <Field label="Exclude keywords"><input className="input" name="excludedKeywords" placeholder="senior director, unpaid, sales" /></Field>
       </div>
-      <div className="grid gap-4 md:grid-cols-3">
-        <div>
-          <label className="mb-2 block text-sm font-bold text-white/70">Locations</label>
-          <input className="input" name="locationPreference" placeholder="Dhaka, Remote, Germany" />
-        </div>
-        <div>
-          <label className="mb-2 block text-sm font-bold text-white/70">Job types</label>
-          <input className="input" name="jobTypes" placeholder="Full-time, Internship, Contract" />
-        </div>
-        <div>
-          <label className="mb-2 block text-sm font-bold text-white/70">Scan frequency</label>
+
+      <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <Field label="Locations"><input className="input" name="locationPreference" placeholder="Dhaka, Remote, Bangladesh" /></Field>
+        <Field label="Job types"><input className="input" name="jobTypes" placeholder="Full-time, Internship, Contract" /></Field>
+        <Field label="Automatic scan frequency">
           <select className="input" name="scanFrequency" defaultValue="DAILY">
-            <option value="MANUAL">Manual</option>
-            <option value="DAILY">Daily</option>
-            <option value="TWICE_DAILY">Twice daily</option>
-            <option value="WEEKLY">Weekly</option>
+            <option value="TWICE_DAILY">Every 12 hours</option>
+            <option value="DAILY">Every 24 hours</option>
+            <option value="WEEKLY">Every 7 days</option>
+            <option value="MANUAL">Manual only</option>
           </select>
-        </div>
+        </Field>
       </div>
-      {error ? <div className="rounded-2xl border border-red-300/20 bg-red-500/10 p-3 text-sm text-red-100">{error}</div> : null}
-      <button className="btn-primary" disabled={busy} type="submit">{busy ? "Saving..." : "Add smart source"}</button>
+
+      {error ? <div className="mt-4 rounded-xl border border-[var(--danger)]/30 bg-[var(--danger-soft)] p-3 text-sm text-[var(--danger)]">{error}</div> : null}
+      <button className="btn-primary mt-5 w-full md:w-auto" disabled={busy} type="submit"><Plus size={17} /> {busy ? "Saving source..." : "Add monitored source"}</button>
     </form>
   );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="block"><span className="mb-2 block text-xs font-bold text-[var(--muted)]">{label}</span>{children}</label>;
 }

@@ -1,6 +1,6 @@
 {
   "name": "applypilot-ai",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "ApplyPilot AI - AI-assisted job discovery, tracking, and application management webapp.",
   "scripts": {
@@ -12,18 +12,16 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "worker": "tsx src/scripts/worker.ts",
-    "scan:once": "tsx src/scripts/scan-once.ts"
+    "scan:once": "tsx src/scripts/scan-once.ts",
+    "repair:data": "tsx src/scripts/repair-data.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.14.0",
     "bcryptjs": "^2.4.3",
-    "bullmq": "^5.59.0",
     "cheerio": "^1.0.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "got": "^14.4.7",
-    "ioredis": "^5.4.1",
     "lucide-react": "^0.468.0",
     "next": "^15.4.0",
     "playwright": "^1.54.0",

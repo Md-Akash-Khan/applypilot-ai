@@ -6,13 +6,11 @@ export default function PasteImportPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="AI Paste Parser"
-        title="Paste any job post. Get a clean, trackable job card."
-        description="Paste full job content from LinkedIn, a company page, email, or a circular. The parser extracts title, company, deadline, location, role type, category, and relevance score."
+        eyebrow="Smart extraction"
+        title="Turn any job post into a clean application record"
+        description="Paste the original content, review the extracted essentials, and save it with the correct deadline and direct link. Long source text stays in the background instead of cluttering your workspace."
       />
-      <div className="glass rounded-[2rem] p-5">
-        <PasteImporter />
-      </div>
+      <PasteImporter />
     </AppShell>
   );
 }

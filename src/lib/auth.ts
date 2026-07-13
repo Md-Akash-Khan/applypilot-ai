@@ -13,7 +13,7 @@ type SessionPayload = {
 };
 
 function secret() {
-  return process.env.APP_SESSION_SECRET || "dev-only-change-me";
+  return process.env.APP_SESSION_SECRET || process.env.NEXTAUTH_SECRET || "dev-only-change-me";
 }
 
 function sign(payload: string) {

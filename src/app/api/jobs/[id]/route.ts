@@ -32,3 +32,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   return NextResponse.json({ job });
 }
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
+  const { id } = await params;
+  const existing = await prisma.job.findFirst({ where: { id, userId: user.id } });
+  if (!existing) return NextResponse.json({ error: "Job not found" }, { status: 404 });
+
+  await prisma.job.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
+}

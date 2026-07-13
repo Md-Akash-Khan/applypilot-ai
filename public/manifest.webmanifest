@@ -1,12 +1,17 @@
 {
   "name": "ApplyPilot AI",
   "short_name": "ApplyPilot",
-  "description": "Your AI-assisted command center for every career opportunity.",
+  "description": "AI-assisted job discovery, deadline tracking, and application management.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#07111F",
-  "theme_color": "#16E6FF",
+  "background_color": "#f5f7fb",
+  "theme_color": "#4f46e5",
   "icons": [
-    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml" }
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
   ]
 }

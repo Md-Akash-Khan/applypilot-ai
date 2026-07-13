@@ -6,9 +6,9 @@ export default function ManualImportPage() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Manual Entry"
-        title="Save a job manually"
-        description="Use this when you already know the role, deadline, company, and apply link."
+        eyebrow="Manual entry"
+        title="Save an opportunity in under a minute"
+        description="Add the same essentials you previously kept in a spreadsheet: role, company, deadline, status, and a direct link."
       />
       <ManualJobForm />
     </AppShell>
