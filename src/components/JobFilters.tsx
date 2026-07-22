@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Filter, Search, X } from "lucide-react";
 
@@ -25,6 +25,7 @@ export default function JobFilters({ initialQuery, category, status, deadline, l
   const [query, setQuery] = useState(initialQuery);
   const [open, setOpen] = useState(false);
   const [exact, setExact] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
   const matches = useMemo(() => {
@@ -36,23 +37,71 @@ export default function JobFilters({ initialQuery, category, status, deadline, l
       .slice(0, 7);
   }, [query, suggestions]);
 
-  function choose(value: string) {
-    setQuery(value);
-    setExact(true);
+  useEffect(() => {
+    setQuery(initialQuery);
     setOpen(false);
-    const form = formRef.current;
-    if (form) window.requestAnimationFrame(() => form.requestSubmit());
-  }
+    setActiveIndex(-1);
+  }, [initialQuery]);
 
-  function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function navigate(matchMode: "exact" | "related", queryOverride?: string) {
+    const form = formRef.current;
+    if (!form) return;
+
     const params = new URLSearchParams();
-    const data = new FormData(event.currentTarget);
+    const data = new FormData(form);
     for (const [key, value] of data.entries()) {
       const clean = String(value).trim();
       if (clean) params.set(key, clean);
     }
+    if (queryOverride !== undefined) {
+      const cleanQuery = queryOverride.trim();
+      if (cleanQuery) params.set("q", cleanQuery);
+      else params.delete("q");
+    }
+    params.set("match", matchMode);
     router.push(`/jobs${params.size ? `?${params.toString()}` : ""}`);
+  }
+
+  function choose(value: string) {
+    setQuery(value);
+    setExact(true);
+    setOpen(false);
+    setActiveIndex(-1);
+    navigate("exact", value);
+  }
+
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setOpen(false);
+    setActiveIndex(-1);
+    navigate(exact ? "exact" : "related", query);
+  }
+
+  function handleSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Escape") {
+      setOpen(false);
+      setActiveIndex(-1);
+      return;
+    }
+
+    if (event.key === "ArrowDown" && matches.length) {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex((current) => (current + 1) % matches.length);
+      return;
+    }
+
+    if (event.key === "ArrowUp" && matches.length) {
+      event.preventDefault();
+      setOpen(true);
+      setActiveIndex((current) => (current <= 0 ? matches.length - 1 : current - 1));
+      return;
+    }
+
+    if (event.key === "Enter" && open && activeIndex >= 0 && matches[activeIndex]) {
+      event.preventDefault();
+      choose(matches[activeIndex].value);
+    }
   }
 
   return (
@@ -66,17 +115,19 @@ export default function JobFilters({ initialQuery, category, status, deadline, l
             className="input job-search-input"
             name="q"
             value={query}
-            onChange={(event) => { setQuery(event.target.value); setExact(false); setOpen(true); }}
-            onFocus={() => setOpen(true)}
-            onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+            onChange={(event) => { setQuery(event.target.value); setExact(false); setOpen(true); setActiveIndex(-1); }}
+            onFocus={() => { setOpen(true); setActiveIndex(-1); }}
+            onBlur={() => window.setTimeout(() => { setOpen(false); setActiveIndex(-1); }, 120)}
+            onKeyDown={handleSearchKeyDown}
             placeholder="Try ‘software’, ‘data analyst’, or a company name"
             autoComplete="off"
             role="combobox"
             aria-expanded={open && matches.length > 0}
             aria-controls="job-search-suggestions"
+            aria-activedescendant={activeIndex >= 0 ? `job-search-suggestion-${activeIndex}` : undefined}
           />
           {query ? (
-            <button type="button" className="job-search-clear" onClick={() => { setQuery(""); setExact(false); setOpen(false); }} aria-label="Clear search">
+            <button type="button" className="job-search-clear" onClick={() => { setQuery(""); setExact(false); setOpen(false); setActiveIndex(-1); }} aria-label="Clear search">
               <X size={16} />
             </button>
           ) : null}
@@ -84,7 +135,17 @@ export default function JobFilters({ initialQuery, category, status, deadline, l
         {open && matches.length ? (
           <div id="job-search-suggestions" className="job-suggestions" role="listbox">
             {matches.map((item, index) => (
-              <button key={`${item.value}-${index}`} type="button" role="option" className="job-suggestion" onMouseDown={(event) => event.preventDefault()} onClick={() => choose(item.value)}>
+              <button
+                id={`job-search-suggestion-${index}`}
+                key={`${item.value}-${index}`}
+                type="button"
+                role="option"
+                aria-selected={activeIndex === index}
+                className="job-suggestion"
+                onMouseDown={(event) => event.preventDefault()}
+                onMouseEnter={() => setActiveIndex(index)}
+                onClick={() => choose(item.value)}
+              >
                 <Search size={15} />
                 <span className="min-w-0 flex-1 text-left"><strong className="block truncate">{item.label}</strong>{item.meta ? <small className="block truncate">{item.meta}</small> : null}</span>
               </button>
