@@ -90,6 +90,27 @@ function findLabelValue(raw: string, labels: string[]) {
   return cleanValue(raw.match(lineRegex)?.[1]);
 }
 
+function looksLikeSalary(value?: string | null) {
+  if (!value) return false;
+  return /(?:৳|\$|€|£|₹|\b(?:tk\.?|taka|bdt|usd|eur|gbp|inr)\b|\d[\d,.]*\s*(?:to|[-–—])\s*(?:৳|\$|€|£|₹)?\s*\d)/i.test(value);
+}
+
+function extractSalary(raw: string) {
+  const labels = ["salary range", "monthly salary", "salary", "compensation", "remuneration", "pay range"];
+  const labelled = findLabelValue(raw, labels);
+  if (looksLikeSalary(labelled)) return labelled;
+
+  // Many job boards omit a colon, for example:
+  // "Monthly Salary 35,000 Taka to 50,000 Taka based on competencies".
+  // Keep this line-based so a heading such as "Compensation & Other Benefits"
+  // cannot accidentally consume text from the next section.
+  const salaryLine = linesOf(raw)
+    .map((line) => line.match(/^(?:monthly\s+salary|salary\s+range|salary|remuneration|pay\s+range)\s*(?::|[-–—])?\s+(.+)$/i)?.[1])
+    .find((value) => looksLikeSalary(value));
+
+  return cleanValue(salaryLine);
+}
+
 export function parseDeadline(value?: string | null): Date | null {
   if (!value) return null;
   const match = value.match(new RegExp(datePattern, "i"));
@@ -300,7 +321,7 @@ function fallbackParse(rawInput: string, preferences?: PreferenceInput, hints: J
   const deadline = extractDeadline(raw);
   const location = extractLocation(raw, hints.location);
   const jobType = extractJobType(raw, hints.jobType);
-  const salary = findLabelValue(raw, ["salary range", "monthly salary", "salary", "compensation", "remuneration", "pay range"]);
+  const salary = extractSalary(raw);
   const applyUrl = validHttpUrl(hints.applyUrl) || firstUrl(raw);
   const description = conciseDescription(raw, title, company);
   const requirements = extractRequirements(raw);
