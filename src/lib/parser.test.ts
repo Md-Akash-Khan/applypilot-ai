@@ -41,3 +41,43 @@ Essential Requirements
   }
 });
 
+test("extracts a colonless monthly salary after requirements and benefits headings", async () => {
+  const previousKey = process.env.OPENAI_API_KEY;
+  delete process.env.OPENAI_API_KEY;
+  try {
+    const parsed = await parseJobText(`
+Business Development Analyst (SBA I/SBA II) (Night Shift)
+Deadline: August 15, 2026 | Type: Full Time | TIMING: Night Shift
+
+Business Development Analyst (Night Shift)
+
+Overview: Apex DMIT Limited is looking for Business Development Analyst who is passionate about impacting lives and empowering people through modern technology.
+
+Expected Knowledge & Skills
+High proficiency in English communication
+Computer literacy
+Analytical capability
+
+Educational Requirements:
+Bachelor's degree in any discipline from a reputed university
+
+Experience Requirements:
+Fresh graduates or experienced professionals (up to a maximum of 3 years) are encouraged to apply.
+
+Compensation & Other Benefits:
+Monthly Salary 35,000 Taka to 50,000 Taka based on competencies and skills.
+Monthly Travel Allowance
+Quarterly/ Yearly Performance Bonus
+Yearly Salary Review
+Yearly 2 Festival Bonus
+`);
+
+    assert.equal(parsed.title, "Business Development Analyst (SBA I/SBA II) (Night Shift)");
+    assert.equal(parsed.company, "Apex DMIT Limited");
+    assert.equal(parsed.salary, "35,000 Taka to 50,000 Taka based on competencies and skills.");
+    assert.match(parsed.requirements || "", /Bachelor's degree/);
+    assert.doesNotMatch(parsed.requirements || "", /Monthly Salary/);
+  } finally {
+    if (previousKey) process.env.OPENAI_API_KEY = previousKey;
+  }
+});
