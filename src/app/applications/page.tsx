@@ -74,7 +74,7 @@ export default async function ApplicationsPage() {
                     const directLink = job.applyUrl || job.sourceUrl;
                     const expired = isDeadlineExpired(job.deadline);
                     return (
-                      <article key={job.id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--border-strong)]">
+                      <article key={job.id} className="tracker-card rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--border-strong)]">
                         <div className="flex gap-3">
                           <CompanyAvatar company={job.company} size="sm" url={job.applyUrl || job.sourceUrl} />
                           <div className="min-w-0 flex-1">

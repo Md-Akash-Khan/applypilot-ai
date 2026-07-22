@@ -5,18 +5,18 @@
 :root,
 html[data-theme="light"] {
   color-scheme: light;
-  --background: #f3f6fb;
-  --background-strong: #e9eef7;
+  --background: #f6f8fc;
+  --background-strong: #eef2f8;
   --surface: #ffffff;
   --surface-elevated: #ffffff;
-  --surface-muted: #edf2f8;
-  --surface-hover: #e4ebf5;
+  --surface-muted: #f1f4f9;
+  --surface-hover: #e9eef7;
   --text: #18243a;
   --text-strong: #081327;
   --muted: #536079;
   --subtle: #748198;
-  --border: #d5deeb;
-  --border-strong: #bdc9da;
+  --border: #dce3ed;
+  --border-strong: #c7d1df;
   --primary: #4f46e5;
   --primary-strong: #3730a3;
   --primary-soft: #ecebff;
@@ -28,8 +28,8 @@ html[data-theme="light"] {
   --warning-soft: #fff0d5;
   --danger: #c24141;
   --danger-soft: #fff0f0;
-  --shadow-sm: 0 7px 22px rgba(35, 54, 88, 0.075);
-  --shadow-lg: 0 22px 56px rgba(35, 54, 88, 0.13);
+  --shadow-sm: 0 4px 14px rgba(26, 43, 70, 0.055);
+  --shadow-lg: 0 18px 42px rgba(26, 43, 70, 0.12);
 }
 
 html[data-theme="dark"] {
@@ -83,7 +83,7 @@ body {
 }
 
 html[data-theme="light"] body {
-  background: linear-gradient(135deg, #f8fafc 0%, #f3f6fb 46%, #edf2ff 100%);
+  background: #f6f8fc;
 }
 
 html[data-theme="light"] .app-sidebar,
@@ -92,6 +92,10 @@ html[data-theme="light"] .mobile-header,
 html[data-theme="light"] .mobile-navigation {
   background: #ffffff;
   backdrop-filter: none;
+}
+
+html[data-theme="light"] .app-sidebar {
+  box-shadow: 8px 0 30px rgba(28, 45, 72, 0.035);
 }
 
 button,
@@ -205,11 +209,24 @@ a {
   align-items: center;
   gap: 12px;
   border: 1px solid transparent;
-  border-radius: 13px;
-  padding: 11px 13px;
+  border-radius: 12px;
+  padding: 8px 10px;
   color: var(--muted);
   font-size: 14px;
   font-weight: 650;
+  transition: 160ms ease;
+}
+
+.nav-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  color: var(--subtle);
   transition: 160ms ease;
 }
 
@@ -222,7 +239,15 @@ a {
   border-color: color-mix(in srgb, var(--primary) 25%, var(--border));
   background: var(--primary-soft);
   color: var(--primary-strong);
-  box-shadow: inset 3px 0 0 var(--primary);
+  box-shadow: none;
+}
+
+.nav-link:hover .nav-icon,
+.nav-link-active .nav-icon {
+  border-color: color-mix(in srgb, var(--primary) 32%, var(--border));
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 10%, transparent);
 }
 
 .sidebar-insight {
@@ -344,11 +369,11 @@ textarea.input {
 .btn-primary {
   min-height: 44px;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 66%, var(--accent)));
+  background: var(--primary);
   color: #fff;
   font-weight: 750;
   padding: 0.75rem 1.05rem;
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--primary) 24%, transparent);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 18%, transparent);
 }
 
 .btn-primary:hover,
@@ -659,12 +684,16 @@ textarea.input {
 }
 
 .lane-scroll {
-  max-height: 570px;
+  max-height: 392px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   scrollbar-color: var(--border-strong) transparent;
   scrollbar-width: thin;
+}
+
+.tracker-card {
+  min-height: 178px;
 }
 
 .lane-scroll::-webkit-scrollbar {

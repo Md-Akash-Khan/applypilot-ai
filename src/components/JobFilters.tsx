@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Filter, Search, X } from "lucide-react";
 
 export type JobFilterSuggestion = {
@@ -23,6 +24,9 @@ type Props = {
 export default function JobFilters({ initialQuery, category, status, deadline, link, sort, suggestions }: Props) {
   const [query, setQuery] = useState(initialQuery);
   const [open, setOpen] = useState(false);
+  const [exact, setExact] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const router = useRouter();
   const matches = useMemo(() => {
     const search = query.toLowerCase().trim();
     if (search.length < 1) return [];
@@ -34,11 +38,26 @@ export default function JobFilters({ initialQuery, category, status, deadline, l
 
   function choose(value: string) {
     setQuery(value);
+    setExact(true);
     setOpen(false);
+    const form = formRef.current;
+    if (form) window.requestAnimationFrame(() => form.requestSubmit());
+  }
+
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const params = new URLSearchParams();
+    const data = new FormData(event.currentTarget);
+    for (const [key, value] of data.entries()) {
+      const clean = String(value).trim();
+      if (clean) params.set(key, clean);
+    }
+    router.push(`/jobs${params.size ? `?${params.toString()}` : ""}`);
   }
 
   return (
-    <form className="job-filter-panel card mb-6" action="/jobs" role="search">
+    <form ref={formRef} className="job-filter-panel card mb-6" action="/jobs" role="search" onSubmit={submit}>
+      <input type="hidden" name="match" value={exact ? "exact" : "related"} />
       <div className="job-filter-search">
         <label className="relative block">
           <span className="sr-only">Search jobs</span>
@@ -47,7 +66,7 @@ export default function JobFilters({ initialQuery, category, status, deadline, l
             className="input job-search-input"
             name="q"
             value={query}
-            onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
+            onChange={(event) => { setQuery(event.target.value); setExact(false); setOpen(true); }}
             onFocus={() => setOpen(true)}
             onBlur={() => window.setTimeout(() => setOpen(false), 120)}
             placeholder="Try ‘software’, ‘data analyst’, or a company name"
@@ -57,7 +76,7 @@ export default function JobFilters({ initialQuery, category, status, deadline, l
             aria-controls="job-search-suggestions"
           />
           {query ? (
-            <button type="button" className="job-search-clear" onClick={() => { setQuery(""); setOpen(false); }} aria-label="Clear search">
+            <button type="button" className="job-search-clear" onClick={() => { setQuery(""); setExact(false); setOpen(false); }} aria-label="Clear search">
               <X size={16} />
             </button>
           ) : null}
@@ -121,4 +140,3 @@ export default function JobFilters({ initialQuery, category, status, deadline, l
 function FilterSelect({ name, defaultValue, label, children }: { name: string; defaultValue: string; label: string; children: React.ReactNode }) {
   return <label className="job-filter-field"><span>{label}</span><select className="input" name={name} defaultValue={defaultValue}>{children}</select></label>;
 }
-

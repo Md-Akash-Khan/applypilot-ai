@@ -23,7 +23,7 @@ export default function Navigation({ variant = "sidebar" }: { variant?: "sidebar
         const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
         return (
           <Link key={item.href} href={item.href} className={active ? "nav-link nav-link-active" : "nav-link"}>
-            <Icon size={18} aria-hidden="true" />
+            <span className="nav-icon"><Icon size={17} strokeWidth={2} aria-hidden="true" /></span>
             <span>{variant === "mobile" ? item.mobileLabel : item.label}</span>
           </Link>
         );

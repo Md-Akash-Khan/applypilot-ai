@@ -14,6 +14,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   const user = await requireUser();
   const params = await searchParams;
   const q = params.q?.trim() || "";
+  const exactMatch = params.match === "exact";
   const category = params.category as JobCategory | undefined;
   const status = params.status as JobStatus | undefined;
   const deadline = params.deadline || "";
@@ -22,7 +23,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
 
   const filters: Prisma.JobWhereInput[] = [];
   if (q) {
-    const terms = expandJobSearchTerms(q);
+    const terms = exactMatch ? [q] : expandJobSearchTerms(q);
     filters.push({
       OR: terms.flatMap((term) => [
         { title: { contains: term, mode: "insensitive" as const } },
