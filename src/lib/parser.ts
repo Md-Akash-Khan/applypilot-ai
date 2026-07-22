@@ -47,6 +47,23 @@ function cleanValue(value?: string | null) {
   return result || null;
 }
 
+function cleanRichText(value?: string | null) {
+  if (!value) return null;
+  const result = value
+    .replace(/\r/g, "")
+    .replace(/\u00a0/g, " ")
+    .replace(/[\t ]*[•●▪◦][\t ]*/g, "\n• ")
+    .replace(/(^|\n)[\t ]*[-*][\t ]+/g, "$1• ")
+    .split("\n")
+    .map((line) => line.replace(/[\t ]+/g, " ").trim())
+    .filter(Boolean)
+    .filter((line, index, lines) => index === 0 || line.toLowerCase() !== lines[index - 1].toLowerCase())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return result || null;
+}
+
 function linesOf(raw: string) {
   return raw.split(/\n|\s+\|\s+/).map((line) => line.trim()).filter(Boolean);
 }
@@ -81,8 +98,12 @@ export function parseDeadline(value?: string | null): Date | null {
     .replace(/,/g, "")
     .trim();
 
-  const direct = new Date(normalized);
-  if (!Number.isNaN(direct.getTime())) return direct;
+  const isoDateOnly = normalized.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (isoDateOnly) {
+    const [, year, month, day] = isoDateOnly;
+    const parsed = new Date(Number(year), Number(month) - 1, Number(day), 12, 0, 0, 0);
+    if (isValid(parsed)) return parsed;
+  }
 
   const formats = [
     "yyyy-MM-dd",
@@ -99,8 +120,14 @@ export function parseDeadline(value?: string | null): Date | null {
 
   for (const format of formats) {
     const parsed = parse(normalized, format, new Date());
-    if (isValid(parsed)) return parsed;
+    if (isValid(parsed)) {
+      parsed.setHours(12, 0, 0, 0);
+      return parsed;
+    }
   }
+
+  const direct = new Date(normalized);
+  if (!Number.isNaN(direct.getTime())) return direct;
   return null;
 }
 
@@ -112,31 +139,67 @@ function extractDeadline(raw: string) {
   return cleanValue(standalone?.[1]);
 }
 
+const roleSignal = /\b(engineer|developer|programmer|analyst|specialist|executive|assistant|manager|officer|designer|architect|consultant|coordinator|administrator|accountant|auditor|intern|trainee|associate|lead|head|director|researcher|lecturer|professor|recruiter|sales|marketing|support|operations|product|project|quality|finance|hr|human resources)\b/i;
+
+function plausibleJobTitle(value?: string | null) {
+  const title = cleanValue(value);
+  if (!title || title.length < 4 || title.length > 150) return false;
+  if (/\b(logo|image|banner|thumbnail|apply now|career page|job circular|vacancy announcement)\b/i.test(title)) return false;
+  if (/^(fresher|freshers|full[- ]?time|part[- ]?time|internship|remote|hybrid|on[- ]?site|not listed|unknown)$/i.test(title)) return false;
+  if (/^(wellcome|welcome|about us|what we do|our products?|why us|home|careers?|jobs?|openings?)$/i.test(title)) return false;
+  if (/\b(is|are)\s+(?:a|an|the|looking|seeking|hiring)\b/i.test(title) || /[.!?]$/.test(title)) return false;
+  return roleSignal.test(title);
+}
+
+function titleScore(value: string) {
+  let score = 0;
+  const matches = value.match(new RegExp(roleSignal.source, "gi"))?.length || 0;
+  score += Math.min(matches, 3) * 4;
+  if (/\b(software|data|business|technical|development|engineering|technology|customer|client)\b/i.test(value)) score += 2;
+  if (value.length <= 90) score += 1;
+  if (/\b(logo|apply|company|deadline|salary|overview|requirement)\b/i.test(value)) score -= 8;
+  return score;
+}
+
 function likelyTitle(raw: string, hint?: string | null) {
-  if (cleanValue(hint)) return cleanValue(hint) as string;
+  const hinted = cleanValue(hint);
+  if (plausibleJobTitle(hinted)) return hinted as string;
 
   const explicit = findLabelValue(raw, ["job title", "position title", "position", "role", "vacancy"]);
-  if (explicit && explicit.length <= 150) return explicit;
+  if (plausibleJobTitle(explicit)) return explicit as string;
 
   const ignored = /^(apply|apply for this job|job vacancy announcement|overview|description|requirements?|qualifications?|responsibilities?|job details?|career opportunities?|jobs? at|view \d+ openings?)/i;
-  const candidate = linesOf(raw).find((line) => {
-    if (line.length < 4 || line.length > 150) return false;
-    if (/^https?:/i.test(line) || line.includes("@") || ignored.test(line)) return false;
-    if (/^(deadline|type|timing|location|salary)\s*:/i.test(line)) return false;
-    return /[A-Za-z]/.test(line);
-  });
+  const candidate = linesOf(raw)
+    .slice(0, 80)
+    .filter((line) => {
+      if (/^https?:/i.test(line) || line.includes("@") || ignored.test(line)) return false;
+      if (/^(deadline|type|timing|location|salary|position)\s*:/i.test(line)) return false;
+      return plausibleJobTitle(line);
+    })
+    .sort((a, b) => titleScore(b) - titleScore(a))[0];
 
-  return candidate || "Untitled Job";
+  return candidate || hinted || "Untitled Job";
+}
+
+function plausibleCompany(value?: string | null) {
+  const company = cleanValue(value);
+  if (!company || company.length < 2 || company.length > 100) return false;
+  if (/\b(logo|unknown company|career page|job circular)\b/i.test(company)) return false;
+  if (/^(as |we |our |you |the role|this role|join us)/i.test(company)) return false;
+  if (/\b(we|you)\s+(?:are|will|can|should)\b/i.test(company)) return false;
+  if (/\b(?:is|are)\s+(?:looking|seeking|hiring|a technology|an? software)\b/i.test(company)) return false;
+  return !/[.!?]$/.test(company);
 }
 
 function extractCompany(raw: string, hint?: string | null) {
   const fromHint = cleanValue(hint);
-  if (fromHint && !/^(unknown|company|career page)/i.test(fromHint)) return fromHint;
+  if (plausibleCompany(fromHint)) return fromHint as string;
 
   const explicit = findLabelValue(raw, ["company", "organization", "organisation", "employer", "institution", "institute"]);
-  if (explicit) return explicit;
+  if (plausibleCompany(explicit)) return explicit as string;
 
   const patterns = [
+    /(?:^|\n)([A-Z][A-Za-z0-9&.,'()\- ]{1,80}?)\s+is\s+(?:an?|the)\s+(?:technology[- ]driven|software development|technology|IT|digital|engineering|consulting|healthcare)\b/i,
     /(?:overview\s*:\s*)?([A-Z][A-Za-z0-9&.,'()\- ]{2,90}?)\s+(?:is|are)\s+(?:looking|seeking|hiring|inviting|recruiting)\b/,
     /(?:join|work at|career at)\s+([A-Z][A-Za-z0-9&.,'()\- ]{2,80})(?:\.|,|\n)/i,
     /\bat\s+([A-Z][A-Za-z0-9&.,'()\- ]{2,70})(?:\.|,|\n|\s+as\b)/
@@ -144,7 +207,7 @@ function extractCompany(raw: string, hint?: string | null) {
 
   for (const pattern of patterns) {
     const match = raw.match(pattern)?.[1];
-    if (match) return cleanValue(match) || "Unknown Company";
+    if (plausibleCompany(match)) return cleanValue(match) as string;
   }
 
   return "Unknown Company";
@@ -200,33 +263,31 @@ function sectionBetween(raw: string, starts: RegExp[], stops: RegExp[]) {
     result.push(lines[index]);
     if (result.join(" ").length > 1600) break;
   }
-  return cleanValue(result.join("\n"));
+  return cleanRichText(result.join("\n"));
 }
 
 function conciseDescription(raw: string, title: string, company: string) {
   const overview = sectionBetween(
     raw,
     [/^overview\b/i, /^about (?:the )?role\b/i, /^job summary\b/i, /^description\b/i],
-    [/^responsibilit/i, /^requirement/i, /^qualification/i, /^no\.? of vacancies?/i, /^job highlight/i, /^apply\b/i, /^benefit/i]
+    [/^responsibilit/i, /^requirement/i, /^qualification/i, /^timeline/i, /^eligibility/i, /^general information/i, /^no\.? of vacancies?/i, /^job highlight/i, /^apply\b/i, /^benefit/i, /^compensation/i]
   );
 
   if (overview) return overview.slice(0, 900);
 
   const sentences = raw
-    .replace(title, "")
-    .replace(company, "")
     .split(/(?<=[.!?])\s+|\n+/)
     .map((part) => part.trim())
     .filter((part) => part.length >= 35 && part.length <= 360)
     .filter((part) => !/^(apply|deadline|location|job type|employment type|salary|job vacancy announcement)/i.test(part));
 
-  return (sentences.slice(0, 3).join(" ") || `${title} opportunity at ${company}.`).slice(0, 900);
+  return (cleanRichText(sentences.slice(0, 3).join(" ")) || `${title} opportunity at ${company}.`).slice(0, 900);
 }
 
 function extractRequirements(raw: string) {
   const requirements = sectionBetween(
     raw,
-    [/^requirements?\b/i, /^qualifications?\b/i, /^eligibility\b/i, /^what we are looking for\b/i, /^expected knowledge/i, /^educational requirements?/i, /^experience requirements?/i],
+    [/^essential requirements?\b/i, /^requirements?\b/i, /^qualifications?\b/i, /^eligibility\b/i, /^what we are looking for\b/i, /^expected knowledge/i, /^educational requirements?/i, /^experience requirements?/i],
     [/^responsibilit/i, /^benefit/i, /^compensation/i, /^apply\b/i, /^application process/i, /^about (?:the )?company/i]
   );
   return requirements?.slice(0, 1400) || null;
@@ -239,7 +300,7 @@ function fallbackParse(rawInput: string, preferences?: PreferenceInput, hints: J
   const deadline = extractDeadline(raw);
   const location = extractLocation(raw, hints.location);
   const jobType = extractJobType(raw, hints.jobType);
-  const salary = findLabelValue(raw, ["salary", "compensation", "remuneration", "pay range"]);
+  const salary = findLabelValue(raw, ["salary range", "monthly salary", "salary", "compensation", "remuneration", "pay range"]);
   const applyUrl = validHttpUrl(hints.applyUrl) || firstUrl(raw);
   const description = conciseDescription(raw, title, company);
   const requirements = extractRequirements(raw);
@@ -287,7 +348,7 @@ async function parseWithOpenAI(rawInput: string, hints: JobParseHints): Promise<
       input: [
         {
           role: "system",
-          content: "Extract one job posting into structured fields. Keep description concise (maximum 900 characters) and requirements concise (maximum 1400 characters). Never invent missing facts. Prefer the provided hints when they are reliable."
+          content: "Extract one job posting into structured fields. The title must be the actual role name, never a logo/image label, company name, or seniority label such as Fresher. The company must be an organization name, never a sentence fragment. Write complete, clean sentences in the description and keep requirements as separate concise items. Keep description under 900 characters and requirements under 1400 characters. Preserve any listed salary. Never invent missing facts. Prefer provided hints only when they are reliable."
         },
         {
           role: "user",
@@ -335,13 +396,16 @@ export async function parseJobText(rawInput: string, preferences?: PreferenceInp
     const ai = await parseWithOpenAI(raw, hints);
     if (!ai) return fallback;
 
-    const title = cleanValue(ai.title) || fallback.title;
-    const company = !/^unknown company$/i.test(ai.company) ? cleanValue(ai.company) || fallback.company : fallback.company;
+    const aiTitle = cleanValue(ai.title);
+    const title = plausibleJobTitle(aiTitle) ? aiTitle as string : fallback.title;
+    const aiCompany = cleanValue(ai.company);
+    const company = plausibleCompany(aiCompany) ? aiCompany as string : fallback.company;
     const location = cleanValue(ai.location) || fallback.location;
     const deadline = cleanValue(ai.deadline) || fallback.deadline;
     const jobType = cleanValue(ai.jobType) || fallback.jobType;
-    const description = cleanValue(ai.description) || fallback.description;
-    const requirements = cleanValue(ai.requirements) || fallback.requirements;
+    const aiDescription = cleanRichText(ai.description);
+    const description = aiDescription && !/(^|\n)(?:are|is|and|or|but)\b/.test(aiDescription) ? aiDescription : fallback.description;
+    const requirements = cleanRichText(ai.requirements) || fallback.requirements;
     const applyUrl = validHttpUrl(ai.applyUrl) || fallback.applyUrl;
     const classificationText = `${title}\n${company}\n${raw.slice(0, 420)}`;
     const scoringText = `${title}\n${company}\n${location || ""}\n${jobType || ""}\n${description}\n${requirements || ""}`;

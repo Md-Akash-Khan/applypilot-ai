@@ -145,6 +145,7 @@ export default function PasteImporter() {
               <Field label="Location"><input className="input" value={preview.location} onChange={(e) => update("location", e.target.value)} /></Field>
               <Field label="Application deadline"><input className="input" type="date" value={preview.deadline} onChange={(e) => update("deadline", e.target.value)} /></Field>
               <Field label="Job type"><input className="input" value={preview.jobType} onChange={(e) => update("jobType", e.target.value)} /></Field>
+              <Field label="Salary / compensation"><input className="input" value={preview.salary} onChange={(e) => update("salary", e.target.value)} placeholder="e.g. 50,000 BDT per month" /></Field>
               <Field label="Category">
                 <select className="input" value={preview.category} onChange={(e) => update("category", e.target.value as Preview["category"])}>
                   <option value="PRIVATE_CORPORATE">Private & Corporate</option>

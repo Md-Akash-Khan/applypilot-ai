@@ -7,6 +7,7 @@ import PageHeader from "@/components/PageHeader";
 import CompanyAvatar from "@/components/CompanyAvatar";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { isDeadlineExpired } from "@/lib/deadline";
 
 const lanes: Array<{
   value: JobStatus;
@@ -32,7 +33,7 @@ export default async function ApplicationsPage() {
   });
 
   const activeApplications = jobs.filter((job) => ["APPLIED", "INTERVIEW", "OFFER"].includes(job.status)).length;
-  const upcomingDeadlines = jobs.filter((job) => job.deadline && job.deadline.getTime() >= Date.now()).length;
+  const upcomingDeadlines = jobs.filter((job) => job.deadline && !isDeadlineExpired(job.deadline)).length;
 
   return (
     <AppShell>
@@ -48,13 +49,13 @@ export default async function ApplicationsPage() {
         <Summary label="Upcoming deadlines" value={upcomingDeadlines} />
       </div>
 
-      <div className="overflow-x-auto pb-4">
-        <div className="grid min-w-[1560px] grid-cols-6 gap-4">
+      <div className="pb-4">
+        <div className="tracker-grid">
           {lanes.map((lane) => {
             const Icon = lane.icon;
             const laneJobs = jobs.filter((job) => job.status === lane.value);
             return (
-              <section key={lane.value} className="card min-h-[570px] overflow-hidden">
+              <section key={lane.value} className="tracker-lane card overflow-hidden">
                 <div className="border-b border-[var(--border)] p-4" style={{ borderTop: `4px solid ${lane.accent}` }}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
@@ -68,9 +69,10 @@ export default async function ApplicationsPage() {
                   </div>
                 </div>
 
-                <div className="space-y-3 p-3">
+                <div className="lane-scroll space-y-3 p-3">
                   {laneJobs.map((job) => {
                     const directLink = job.applyUrl || job.sourceUrl;
+                    const expired = isDeadlineExpired(job.deadline);
                     return (
                       <article key={job.id} className="rounded-2xl border border-[var(--border)] bg-[var(--surface-elevated)] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--border-strong)]">
                         <div className="flex gap-3">
@@ -82,7 +84,7 @@ export default async function ApplicationsPage() {
                         </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {job.location ? <span className="badge max-w-full truncate">{job.location}</span> : null}
-                          <span className={job.deadline ? "badge badge-warning" : "badge"}>{job.deadline ? format(job.deadline, "MMM d") : "No deadline"}</span>
+                          <span className={job.deadline ? (expired ? "badge badge-danger" : "badge badge-warning") : "badge"}>{job.deadline ? format(job.deadline, "MMM d") : "No deadline"}</span>
                         </div>
                         <div className="mt-3 grid grid-cols-2 gap-2">
                           <Link href={`/jobs/${job.id}`} className="btn-secondary px-2 py-2 text-xs">Details</Link>

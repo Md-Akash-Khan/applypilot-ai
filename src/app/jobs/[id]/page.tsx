@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { format, isPast } from "date-fns";
+import { format } from "date-fns";
 import { ArrowLeft, ArrowUpRight, Building2, CalendarDays, ExternalLink, FileText, MapPin, WalletCards } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
@@ -10,6 +10,8 @@ import CompanyAvatar from "@/components/CompanyAvatar";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { categoryLabel } from "@/lib/classifier";
+import { isDeadlineExpired } from "@/lib/deadline";
+import StructuredJobText from "@/components/StructuredJobText";
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -21,7 +23,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   if (!job) notFound();
 
   const directLink = job.applyUrl || job.sourceUrl;
-  const expired = Boolean(job.deadline && isPast(job.deadline));
+  const expired = isDeadlineExpired(job.deadline);
 
   return (
     <AppShell>
@@ -43,7 +45,7 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <Meta icon={<Building2 size={16} />} label="Company" value={job.company} />
                 <Meta icon={<MapPin size={16} />} label="Location" value={job.location || "Not listed"} />
-                <Meta icon={<CalendarDays size={16} />} label="Deadline" value={job.deadline ? format(job.deadline, "MMM d, yyyy") : "Not listed"} tone={expired ? "danger" : undefined} />
+                <Meta icon={<CalendarDays size={16} />} label="Deadline" value={job.deadline ? format(job.deadline, "MMM d, yyyy") : "Not listed"} tone={expired ? "danger" : job.deadline ? "warning" : undefined} />
                 <Meta icon={<FileText size={16} />} label="Type" value={job.jobType || "Not listed"} />
               </div>
             </div>
@@ -56,13 +58,13 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
               {expired ? <span className="badge badge-danger">Deadline passed</span> : null}
             </div>
             <h2 className="section-title">Role summary</h2>
-            <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--muted)]">{job.description || "No summary was available."}</p>
+            {job.description ? <StructuredJobText text={job.description} /> : <p className="mt-3 text-sm leading-7 text-[var(--muted)]">No summary was available.</p>}
 
             {job.requirements ? (
               <>
                 <div className="my-6 border-t border-[var(--border)]" />
                 <h2 className="section-title">Essential requirements</h2>
-                <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--muted)]">{job.requirements}</p>
+                <StructuredJobText text={job.requirements} list />
               </>
             ) : null}
           </section>
@@ -118,8 +120,9 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   );
 }
 
-function Meta({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone?: "danger" }) {
-  return <div className="rounded-xl bg-[var(--surface-muted)] p-3"><div className="flex items-center gap-2 text-xs text-[var(--muted)]">{icon} {label}</div><div className={`mt-2 text-sm font-bold ${tone === "danger" ? "text-[var(--danger)]" : "text-[var(--text-strong)]"}`}>{value}</div></div>;
+function Meta({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone?: "danger" | "warning" }) {
+  const toneClass = tone === "danger" ? "text-[var(--danger)]" : tone === "warning" ? "text-[var(--warning)]" : "text-[var(--text-strong)]";
+  return <div className="rounded-xl bg-[var(--surface-muted)] p-3"><div className="flex items-center gap-2 text-xs text-[var(--muted)]">{icon} {label}</div><div className={`mt-2 text-sm font-bold ${toneClass}`}>{value}</div></div>;
 }
 
 function InfoRow({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {

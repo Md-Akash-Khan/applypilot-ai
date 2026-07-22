@@ -125,24 +125,54 @@ function textFromHtml(html: string) {
 function htmlToText(fragment: string) {
   const $ = cheerio.load(fragment || "");
   $("script, style, noscript, svg").remove();
+  $("br").replaceWith("\n");
+  $("p, li, h1, h2, h3, h4, h5, h6").each((_, node) => {
+    const prefix = node.tagName === "li" ? "\n• " : "\n";
+    $(node).prepend(prefix).append("\n");
+  });
   return $("body").text().replace(/[\t ]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function cleanCompanyCandidate(candidate?: string | null) {
+  const cleaned = normalizeWhitespace(candidate || "")
+    .replace(/\b(?:official\s+)?logo\b/gi, "")
+    .replace(/^(jobs?|careers?|openings?)\s+(?:at|with)\s+/i, "")
+    .replace(/\s+[|–—-]\s+(jobs?|careers?|openings?).*$/i, "")
+    .replace(/\s+(jobs?|openings?|careers?)$/i, "")
+    .trim();
+  if (cleaned.length < 2 || cleaned.length > 100) return null;
+  if (/^(unknown|company|career page|home)$/i.test(cleaned)) return null;
+  if (/^(as |we |our |you |the role|this role)/i.test(cleaned)) return null;
+  if (/\b(?:we|you)\s+(?:are|will|can|should)\b|\b(?:is|are)\s+(?:looking|seeking|hiring)\b/i.test(cleaned)) return null;
+  return cleaned;
 }
 
 function metadataCompany(html: string) {
   const $ = cheerio.load(html);
-  const candidates = [
+  const candidates: Array<string | undefined> = [
     $("meta[property='og:site_name']").attr("content"),
-    $("h1").first().text(),
-    $("title").text()
-  ].filter(Boolean) as string[];
+    $("meta[name='application-name']").attr("content"),
+    $("header img[alt], [class*='logo'] img[alt], a[class*='logo'] img[alt]").first().attr("alt")
+  ];
+
+  $('script[type="application/ld+json"]').each((_, node) => {
+    try {
+      for (const item of flattenJsonLd(JSON.parse($(node).text()))) {
+        const types = Array.isArray(item?.["@type"]) ? item["@type"] : [item?.["@type"]];
+        if (types.some((type: string) => /^(Organization|Corporation|LocalBusiness)$/i.test(type)) && item?.name) candidates.push(item.name);
+        if (item?.hiringOrganization?.name) candidates.push(item.hiringOrganization.name);
+      }
+    } catch {
+      // Ignore malformed structured data and continue with visible metadata.
+    }
+  });
+
+  const titleParts = normalizeWhitespace($("title").text()).split(/\s+[|–—-]\s+/).reverse();
+  candidates.push(...titleParts);
 
   for (const candidate of candidates) {
-    const cleaned = normalizeWhitespace(candidate)
-      .replace(/^(jobs?|careers?|openings?)\s+(?:at|with)\s+/i, "")
-      .replace(/\s+[|–—-]\s+(jobs?|careers?|openings?).*$/i, "")
-      .replace(/\s+(jobs?|openings?|careers?)$/i, "")
-      .trim();
-    if (cleaned.length >= 2 && cleaned.length <= 100) return cleaned;
+    const cleaned = cleanCompanyCandidate(candidate);
+    if (cleaned && !/\b(engineer|developer|analyst|specialist|executive|assistant|manager|officer|intern|trainee)\b/i.test(cleaned)) return cleaned;
   }
   return null;
 }
@@ -162,6 +192,18 @@ function locationFromJsonLd(jobLocation: any) {
   return [address?.addressLocality, address?.addressRegion, address?.addressCountry].filter(Boolean).join(", ") || null;
 }
 
+function salaryFromJsonLd(baseSalary: any) {
+  if (!baseSalary) return null;
+  const currency = baseSalary.currency || baseSalary.value?.currency || "";
+  const value = baseSalary.value || baseSalary;
+  const amount = value.minValue && value.maxValue
+    ? `${value.minValue} - ${value.maxValue}`
+    : value.value || value.minValue || value.maxValue;
+  if (!amount) return null;
+  const unit = value.unitText ? ` per ${String(value.unitText).toLowerCase()}` : "";
+  return `${currency ? `${currency} ` : ""}${amount}${unit}`.trim();
+}
+
 function jsonLdJobs(html: string, sourceUrl: string, fallbackCompany?: string | null): DiscoveredJob[] {
   const $ = cheerio.load(html);
   const jobs: DiscoveredJob[] = [];
@@ -178,12 +220,14 @@ function jsonLdJobs(html: string, sourceUrl: string, fallbackCompany?: string | 
         const company = data.hiringOrganization?.name || fallbackCompany || null;
         const location = locationFromJsonLd(data.jobLocation);
         const jobType = Array.isArray(data.employmentType) ? data.employmentType.join(" | ") : data.employmentType || null;
+        const salary = salaryFromJsonLd(data.baseSalary);
         const structuredText = [
           data.title ? `Job Title: ${data.title}` : "",
           company ? `Company: ${company}` : "",
           location ? `Location: ${location}` : "",
           jobType ? `Employment Type: ${jobType}` : "",
           data.validThrough ? `Application Deadline: ${data.validThrough}` : "",
+          salary ? `Salary: ${salary}` : "",
           description
         ].filter(Boolean).join("\n");
 
@@ -384,8 +428,9 @@ function sourceOrGlobal(sourceValue: string | null, globalValue?: string | null)
 }
 
 function safeCompanyName(sourceName: string, discovered?: string | null) {
-  if (discovered && !/^(unknown|jobs?|careers?|openings?)$/i.test(discovered)) return discovered;
-  return sourceName.replace(/\s+(careers?|jobs?|openings?|career page)$/i, "").trim() || sourceName;
+  const discoveredCompany = cleanCompanyCandidate(discovered);
+  if (discoveredCompany) return discoveredCompany;
+  return cleanCompanyCandidate(sourceName) || sourceName;
 }
 
 async function enrichDiscoveredJob(item: DiscoveredJob, sourceName: string) {

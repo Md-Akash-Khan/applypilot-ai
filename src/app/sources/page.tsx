@@ -1,5 +1,5 @@
 import { format, formatDistanceToNow } from "date-fns";
-import { Activity, ArrowUpRight, Clock3, DatabaseZap, ExternalLink, Radar, TriangleAlert } from "lucide-react";
+import { ArrowUpRight, Clock3, DatabaseZap, ExternalLink, Radar, TriangleAlert } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import SourceForm from "@/components/SourceForm";
@@ -21,21 +21,18 @@ export default async function SourcesPage() {
   });
 
   const activeCount = sources.filter((source) => source.status === "ACTIVE" && source.scanFrequency !== "MANUAL").length;
-  const repositoryUrl = process.env.NEXT_PUBLIC_REPOSITORY_URL || "https://github.com/Md-Akash-Khan/applypilot-ai";
-
   return (
     <AppShell>
       <PageHeader
         eyebrow="Automated sources"
         title="Monitor every career page from one workspace"
-        description="ApplyPilot checks due sources automatically through GitHub Actions. Multi-role career pages are split into individual jobs instead of being saved as one long page."
-        action={<a className="btn-secondary" href={`${repositoryUrl}/actions`} target="_blank" rel="noreferrer"><Activity size={16} /> View automation</a>}
+        description="ApplyPilot checks due sources automatically in the background. Multi-role career pages are split into individual jobs instead of being saved as one long page."
       />
 
       <div className="mb-6 grid gap-4 md:grid-cols-3">
         <InfoCard icon={<Radar size={19} />} label="Automatic monitors" value={activeCount} hint="No button clicking required" />
         <InfoCard icon={<DatabaseZap size={19} />} label="Saved sources" value={sources.length} hint="Company, government, and academic" />
-        <InfoCard icon={<Clock3 size={19} />} label="Scheduler" value="Every hour" hint="Due rules run at 12h, 24h, or 7d" />
+        <InfoCard icon={<Clock3 size={19} />} label="Scheduler" value="Automatic" hint="Uses each source’s selected schedule" />
       </div>
 
       <SourceForm />

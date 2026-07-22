@@ -58,21 +58,42 @@ export async function requireUser() {
   return user;
 }
 
-export async function login(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return null;
-  const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return null;
-
+async function setSession(userId: string) {
   const cookieStore = await cookies();
-  cookieStore.set(COOKIE_NAME, encode({ userId: user.id, expiresAt: Date.now() + 14 * DAY_MS }), {
+  cookieStore.set(COOKIE_NAME, encode({ userId, expiresAt: Date.now() + 14 * DAY_MS }), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: 14 * 24 * 60 * 60
   });
+}
 
+export async function login(email: string, password: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+  if (!user) return null;
+  const ok = await bcrypt.compare(password, user.passwordHash);
+  if (!ok) return null;
+  await setSession(user.id);
+  return user;
+}
+
+export async function register(name: string, email: string, password: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const existing = await prisma.user.findUnique({ where: { email: normalizedEmail }, select: { id: true } });
+  if (existing) return null;
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const user = await prisma.user.create({
+    data: {
+      name: name.trim(),
+      email: normalizedEmail,
+      passwordHash,
+      settings: { create: {} }
+    }
+  });
+  await setSession(user.id);
   return user;
 }
 

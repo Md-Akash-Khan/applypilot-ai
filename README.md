@@ -7,6 +7,7 @@ ApplyPilot AI is an online job-discovery and application workspace that replaces
 ## Version 2 highlights
 
 - Professional responsive interface with persistent **light and dark modes**
+- Individual sign-up and sign-in with user-scoped jobs, sources, and tracker data
 - Modern dashboard, filterable job library, source monitor, and visual application pipeline
 - Company/ATS favicon or initials on job and tracker cards
 - Direct **Job link / Apply** actions throughout the dashboard, cards, details, and tracker
@@ -88,7 +89,7 @@ npx prisma db push
 
 This command:
 
-- re-extracts fields from older pasted jobs;
+- re-extracts fields from older pasted jobs, including invalid logo/seniority titles, company fragments, salary, and clean content sections;
 - removes collapsed “Untitled Job” career-listing records;
 - marks affected sources for a fresh automatic scan.
 
@@ -192,5 +193,5 @@ src/app/globals.css                   Light/dark design system
 
 - Keep `DATABASE_URL`, session secrets, and API keys in Vercel/GitHub secrets only.
 - Do not commit `.env`.
-- Change the initial owner password before wider use.
-- The product remains a private single-owner workspace unless multi-user authentication is deliberately added later.
+- Change the optional bootstrap account password before production use.
+- Each signed-in user sees only their own jobs, sources, settings, and application tracker.

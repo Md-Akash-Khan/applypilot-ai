@@ -1,11 +1,14 @@
 import Link from "next/link";
 import type { JobCategory, JobStatus, Prisma } from "@prisma/client";
-import { Filter, Plus, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import AppShell from "@/components/AppShell";
 import PageHeader from "@/components/PageHeader";
 import JobCard from "@/components/JobCard";
+import JobFilters, { type JobFilterSuggestion } from "@/components/JobFilters";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
+import { todayBoundary } from "@/lib/deadline";
+import { expandJobSearchTerms } from "@/lib/job-search";
 
 export default async function JobsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireUser();
@@ -19,14 +22,16 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
 
   const filters: Prisma.JobWhereInput[] = [];
   if (q) {
+    const terms = expandJobSearchTerms(q);
     filters.push({
-      OR: [
-        { title: { contains: q, mode: "insensitive" } },
-        { company: { contains: q, mode: "insensitive" } },
-        { location: { contains: q, mode: "insensitive" } },
-        { jobType: { contains: q, mode: "insensitive" } },
-        { description: { contains: q, mode: "insensitive" } }
-      ]
+      OR: terms.flatMap((term) => [
+        { title: { contains: term, mode: "insensitive" as const } },
+        { company: { contains: term, mode: "insensitive" as const } },
+        { location: { contains: term, mode: "insensitive" as const } },
+        { jobType: { contains: term, mode: "insensitive" as const } },
+        { description: { contains: term, mode: "insensitive" as const } },
+        { requirements: { contains: term, mode: "insensitive" as const } }
+      ])
     });
   }
   if (link === "available") filters.push({ OR: [{ applyUrl: { not: null } }, { sourceUrl: { not: null } }] });
@@ -38,10 +43,11 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     ...(status ? { status } : {})
   };
 
-  if (deadline === "soon") where.deadline = { gte: new Date(), lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) };
-  if (deadline === "expired") where.deadline = { lt: new Date() };
+  const today = todayBoundary();
+  if (deadline === "soon") where.deadline = { gte: today, lte: new Date(today.getTime() + 8 * 24 * 60 * 60 * 1000 - 1) };
+  if (deadline === "expired") where.deadline = { lt: today };
   if (deadline === "none") where.deadline = null;
-  if (deadline === "future") where.deadline = { gte: new Date() };
+  if (deadline === "future") where.deadline = { gte: today };
 
   const orderBy: Prisma.JobOrderByWithRelationInput[] = sort === "deadline"
     ? [{ deadline: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }]
@@ -49,7 +55,24 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
       ? [{ company: "asc" }, { createdAt: "desc" }]
       : [{ createdAt: "desc" }];
 
-  const jobs = await prisma.job.findMany({ where, orderBy, take: 120 });
+  const [jobs, suggestionRows] = await Promise.all([
+    prisma.job.findMany({ where, orderBy, take: 120 }),
+    prisma.job.findMany({
+      where: { userId: user.id, status: { not: "ARCHIVED" } },
+      select: { title: true, company: true, location: true },
+      orderBy: { updatedAt: "desc" },
+      take: 250
+    })
+  ]);
+  const suggestions: JobFilterSuggestion[] = [];
+  const seen = new Set<string>();
+  for (const row of suggestionRows) {
+    const key = row.title.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      suggestions.push({ value: row.title, label: row.title, meta: [row.company, row.location].filter(Boolean).join(" · ") });
+    }
+  }
 
   return (
     <AppShell>
@@ -60,53 +83,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
         action={<Link href="/import/manual" className="btn-primary"><Plus size={16} /> Add job</Link>}
       />
 
-      <form className="card mb-6 p-4 md:p-5" action="/jobs">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-          <label className="relative md:col-span-2 xl:col-span-2">
-            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--subtle)]" size={17} />
-            <input className="input pl-10" name="q" defaultValue={q} placeholder="Search role, company, location..." />
-          </label>
-          <select className="input" name="category" defaultValue={category || ""}>
-            <option value="">All categories</option>
-            <option value="GOVERNMENT">Government</option>
-            <option value="PRIVATE_CORPORATE">Private & Corporate</option>
-            <option value="ACADEMIC_RESEARCH">Academic & Research</option>
-            <option value="UNCATEGORIZED">Uncategorized</option>
-          </select>
-          <select className="input" name="status" defaultValue={status || ""}>
-            <option value="">All statuses</option>
-            <option value="NEW">New</option>
-            <option value="SAVED">Saved</option>
-            <option value="APPLIED">Applied</option>
-            <option value="INTERVIEW">Interview</option>
-            <option value="OFFER">Offer</option>
-            <option value="REJECTED">Rejected</option>
-            <option value="ARCHIVED">Archived</option>
-          </select>
-          <select className="input" name="deadline" defaultValue={deadline}>
-            <option value="">Any deadline</option>
-            <option value="soon">Within 7 days</option>
-            <option value="future">Future deadlines</option>
-            <option value="expired">Expired</option>
-            <option value="none">Not listed</option>
-          </select>
-          <select className="input" name="link" defaultValue={link}>
-            <option value="">Any link status</option>
-            <option value="available">Direct link available</option>
-          </select>
-        </div>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <select className="input sm:max-w-56" name="sort" defaultValue={sort}>
-            <option value="newest">Newest collected first</option>
-            <option value="deadline">Nearest deadline first</option>
-            <option value="company">Company A–Z</option>
-          </select>
-          <div className="flex gap-2">
-            <Link href="/jobs" className="btn-secondary">Clear</Link>
-            <button className="btn-primary" type="submit"><Filter size={16} /> Apply filters</button>
-          </div>
-        </div>
-      </form>
+      <JobFilters initialQuery={q} category={category} status={status} deadline={deadline} link={link} sort={sort} suggestions={suggestions} />
 
       <div className="mb-4 flex items-center justify-between gap-4">
         <div className="text-sm text-[var(--muted)]">Showing <strong className="text-[var(--text-strong)]">{jobs.length}</strong> opportunities</div>

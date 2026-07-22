@@ -1,14 +1,15 @@
 import Link from "next/link";
-import { format, isPast } from "date-fns";
+import { format } from "date-fns";
 import type { Job } from "@prisma/client";
 import { ArrowUpRight, Building2, CalendarDays, MapPin } from "lucide-react";
 import { categoryLabel } from "@/lib/classifier";
 import CompanyAvatar from "@/components/CompanyAvatar";
+import { isDeadlineExpired, isDeadlineSoon } from "@/lib/deadline";
 
 export default function JobCard({ job }: { job: Job }) {
   const link = job.applyUrl || job.sourceUrl;
-  const expired = Boolean(job.deadline && isPast(job.deadline));
-  const deadlineSoon = Boolean(job.deadline && !expired && job.deadline.getTime() < Date.now() + 1000 * 60 * 60 * 24 * 5);
+  const expired = isDeadlineExpired(job.deadline);
+  const deadlineSoon = isDeadlineSoon(job.deadline);
 
   return (
     <article className="card p-5 transition duration-200 hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-lg)]">
@@ -31,14 +32,14 @@ export default function JobCard({ job }: { job: Job }) {
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-[var(--muted)] md:text-sm">
               <span className="inline-flex items-center gap-1.5"><Building2 size={14} /> {job.company}</span>
               {job.location ? <span className="inline-flex items-center gap-1.5"><MapPin size={14} /> {job.location}</span> : null}
-              <span className="inline-flex items-center gap-1.5"><CalendarDays size={14} /> {job.deadline ? format(job.deadline, "MMM d, yyyy") : "Deadline not listed"}</span>
+              <span className={job.deadline ? (expired ? "deadline-label deadline-expired" : "deadline-label") : "inline-flex items-center gap-1.5"}><CalendarDays size={14} /> {job.deadline ? format(job.deadline, "MMM d, yyyy") : "Deadline not listed"}</span>
             </div>
 
             {job.description ? <p className="mt-3 line-clamp-2 max-w-4xl text-sm leading-6 text-[var(--muted)]">{job.description}</p> : null}
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
+        <div className="job-card-actions flex shrink-0 flex-wrap gap-2 lg:justify-end">
           <Link href={`/jobs/${job.id}`} className="btn-secondary">View details</Link>
           {link ? (
             <a href={link} target="_blank" rel="noreferrer" className="btn-primary">

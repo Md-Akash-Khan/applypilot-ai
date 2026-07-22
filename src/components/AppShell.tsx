@@ -21,7 +21,7 @@ export default async function AppShell({ children }: { children: React.ReactNode
 
         <div className="sidebar-insight">
           <div className="sidebar-insight-title"><Radar size={17} /> Automated scanner</div>
-          <p>Career sources are checked online by GitHub Actions. New matching roles appear here automatically.</p>
+          <p>Career sources are checked securely in the background. New matching roles appear here automatically.</p>
         </div>
 
         <div className="sidebar-footer">

@@ -10,6 +10,14 @@ function looksLikeCollapsedListing(title: string, rawText: string | null, source
   return roleSignals >= 3 || text.length > 1800;
 }
 
+function hasBadTitle(title: string) {
+  return /^(untitled job|fresher|freshers)$/i.test(title.trim()) || /\b(?:logo|image|banner|thumbnail)\b/i.test(title);
+}
+
+function hasBadCompany(company: string) {
+  return /^(unknown company|as |we |our |you )/i.test(company.trim()) || /\b(?:we|you)\s+(?:are|will|can|should)\b/i.test(company);
+}
+
 async function main() {
   console.log("ApplyPilot data repair started...");
 
@@ -32,10 +40,12 @@ async function main() {
       continue;
     }
 
+    const titleNeedsRepair = hasBadTitle(job.title);
+    const companyNeedsRepair = hasBadCompany(job.company);
     const needsRepair = Boolean(
       job.rawText && (
-        /^untitled job$/i.test(job.title) ||
-        /^unknown company$/i.test(job.company) ||
+        titleNeedsRepair ||
+        companyNeedsRepair ||
         !job.deadline ||
         job.description.length > 1200 ||
         !job.applyUrl ||
@@ -49,15 +59,15 @@ async function main() {
     }
 
     const parsed = await parseJobText(job.rawText, undefined, {
-      title: /^untitled job$/i.test(job.title) ? null : job.title,
-      company: /^unknown company$/i.test(job.company) ? job.source?.name || null : job.company,
+      title: titleNeedsRepair ? null : job.title,
+      company: companyNeedsRepair ? job.source?.name || null : job.company,
       location: job.location,
       jobType: job.jobType,
       applyUrl: job.applyUrl || job.sourceUrl
     });
 
-    const improvedTitle = /^untitled job$/i.test(job.title) ? parsed.title : job.title;
-    const improvedCompany = /^unknown company$/i.test(job.company) ? parsed.company : job.company;
+    const improvedTitle = titleNeedsRepair ? parsed.title : job.title;
+    const improvedCompany = companyNeedsRepair ? parsed.company : job.company;
     const improvedUrl = parsed.applyUrl || job.applyUrl || job.sourceUrl;
 
     await prisma.job.update({
