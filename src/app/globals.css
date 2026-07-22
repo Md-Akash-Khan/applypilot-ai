@@ -634,7 +634,8 @@ textarea.input {
 }
 
 .job-suggestion:hover,
-.job-suggestion:focus-visible {
+.job-suggestion:focus-visible,
+.job-suggestion[aria-selected="true"] {
   background: var(--surface-hover);
   outline: none;
 }
